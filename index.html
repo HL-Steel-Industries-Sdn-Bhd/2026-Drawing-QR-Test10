@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drawing + Work Entry Demo</title>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+    * { box-sizing: border-box; margin:0; padding:0; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background: linear-gradient(135deg,#667eea 0%,#764ba2 100%); min-height:100vh; padding:20px; }
+    .container { background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.2); width:100%; max-width:1000px; padding:30px; margin: 0 auto; }
+    h2 { color:#333; text-align:center; margin-bottom:30px; font-size:28px; font-weight:600; }
+    
+    /* 电脑版布局 - 使用网格布局确保等高 */
+    .drawing-content {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    @media (min-width: 768px) {
+        .drawing-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: stretch; /* 关键：确保网格项等高 */
+        }
+        
+        .drawing-info, .scan-section {
+            display: flex;
+            flex-direction: column;
+            height: 100%; /* 关键：填充父容器高度 */
+        }
+    }
+    
+    /* 图纸信息卡片样式 */
+    .drawing-card { 
+        background:#f8f9fa; 
+        border-radius:8px; 
+        padding:25px; 
+        border-left:4px solid #667eea; 
+        box-shadow:0 5px 15px rgba(0,0,0,0.05);
+        height: 100%; /* 关键：填充父容器高度 */
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* 手机版 - 减少间距 */
+    @media (max-width: 767px) {
+        .drawing-card { 
+            padding:15px; 
+            margin-bottom:15px; 
+        }
+        
+        h2 {
+            margin-bottom:20px;
+            font-size:24px;
+        }
+        
+        .container {
+            padding:20px;
+        }
+    }
+    
+    .drawing-grid { 
+        display:grid; 
+        grid-template-columns: repeat(1, 1fr);
+        gap:15px; 
+        margin-bottom:0; 
+        flex: 1; /* 关键：填充可用空间 */
+    }
+    
+    @media (min-width: 768px) {
+        .drawing-grid { 
+            grid-template-columns: repeat(2, 1fr); 
+        }
+    }
+    
+    .info-item { 
+        display:flex; 
+        flex-direction:column; 
+        padding:12px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #eee;
+        transition: all 0.3s;
+    }
+    
+    .info-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(102,126,234,0.1);
+    }
+    
+    .info-label { 
+        font-weight:500; 
+        color:#555; 
+        margin-bottom:4px; 
+        font-size:13px; 
+    }
+    
+    .info-value { 
+        font-size:15px; 
+        color:#333;
+        font-weight: 500;
+    }
+    
+    /* 扫描区域样式 - 统一使用蓝色边框 */
+    .scan-section {
+        background:#f8f9fa; 
+        border-radius:8px; 
+        padding:25px; 
+        text-align:center;
+        border-left:4px solid #667eea; /* 改为蓝色边框 */
+        display: flex;
+        flex-direction: column;
+        height: 100%; /* 关键：填充父容器高度 */
+    }
+    
+    .scan-instruction { 
+        font-size:18px; 
+        color:#667eea; 
+        font-weight:600; 
+        margin-bottom: 20px;
+    }
+    
+    .scanner-container {
+        width: 100%;
+        height: 200px;
+        border: 2px dashed #bbb;
+        border-radius: 8px;
+        position: relative;
+        background-color: #f9f9f9;
+        transition: all 0.3s ease;
+        overflow: hidden;
+        margin: 0 auto 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0; /* 防止容器被压缩 */
+    }
+    
+    /* 电脑上的扫描区域 - 正方形并缩小20% */
+    @media (min-width: 768px) {
+        .scanner-container {
+            width: 180px; /* 正方形，缩小20% */
+            height: 180px;
+            margin: 0 auto 20px;
+        }
+    }
+    
+    /* 手机上的扫描区域 - 确保可见 */
+    @media (max-width: 767px) {
+        .scanner-container {
+            height: 250px; /* 恢复原来的高度 */
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        .scan-section {
+            padding:15px;
+            margin-top: 15px;
+        }
+    }
+    
+    /* 虚线框框提示 */
+    .dashed-box {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #777;
+        font-size: 14px;
+    }
+    
+    .dashed-box i {
+        font-size: 40px;
+        margin-bottom: 10px;
+        color: #667eea;
+    }
+    
+    #reader {
+        width: 100%;
+        height: 100%;
+    }
+    
+    /* GIF容器 */
+    .gif-container {
+        text-align: center;
+        margin-top: auto; /* 关键：推到容器底部 */
+        padding-top: 15px;
+        border-top: 1px solid #eee;
+    }
+    
+    .gif-container p {
+        margin-bottom: 10px;
+        color:#555;
+        font-size: 14px;
+    }
+    
+    .gif-container img {
+        width: 130px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* 工作资料部分 - 新设计 */
+    .work-section {
+        display: none;
+    }
+    
+    /* 用户信息显示 */
+    #userDisplay {
+        background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 25px;
+        font-size: 1.2rem;
+        text-align: center;
+        box-shadow: 0 5px 15px rgba(102,126,234,0.3);
+        font-weight: 600;
+    }
+    
+    /* 卡片堆叠切换样式 */
+    .card-stack-container {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        margin-bottom: 30px;
+    }
+    
+    @media (min-width: 768px) {
+        .card-stack-container {
+            flex-direction: row;
+            gap: 40px;
+        }
+        
+        .stack-section {
+            flex: 1;
+        }
+        
+        .info-sidebar {
+            width: 300px;
+            flex-shrink: 0;
+        }
+    }
+    
+    .stack-container {
+        position: relative;
+        width: 100%;
+        height: 170px;
+        touch-action: pan-y;
+        margin-bottom: 20px;
+    }
+    
+    .card-box {
+        position: absolute;
+        inset: 0;
+        border-radius: 14px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 20px;
+        font-weight: bold;
+        cursor: pointer;
+        user-select: none;
+        transition:
+            transform 0.45s ease,
+            opacity 0.45s ease,
+            box-shadow 0.45s ease;
+        color: #333;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    /* 固定颜色 */
+    .c1 { background: #87CEEB; } /* 浅蓝 - Received From */
+    .c2 { background: #D8BFD8; } /* 浅紫 - Job Completed */
+    .c3 { background: #FFB6C1; } /* 浅红 - Quality Control */
+    
+    .card-english {
+        font-size: 22px;
+        margin-bottom: 5px;
+    }
+    
+    .card-chinese {
+        font-size: 16px;
+        font-weight: normal;
+    }
+    
+    /* 内容iframe区域 */
+    .content-frame {
+        width: 100%;
+        height: 400px;
+        border-radius: 10px;
+        border: 2px solid #ddd;
+        background: #fff;
+        padding: 20px;
+        overflow-y: auto;
+    }
+    
+    .frame-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #667eea;
+    }
+    
+    /* 选项样式 */
+    .option-item {
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 12px;
+        padding: 10px;
+        border-radius: 6px;
+        transition: background-color 0.2s;
+    }
+    
+    .option-item:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .option-checkbox {
+        margin-right: 12px;
+        margin-top: 3px;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    .option-label {
+        flex: 1;
+        cursor: pointer;
+    }
+    
+    .option-english {
+        font-size: 15px;
+        color: #333;
+        margin-bottom: 3px;
+    }
+    
+    .option-chinese {
+        font-size: 13px;
+        color: #666;
+    }
+    
+    /* 密码输入区域 */
+    .password-section {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+    
+    .password-input {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .password-input input {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 16px;
+        flex: 1;
+    }
+    
+    .password-input button {
+        padding: 10px 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+    
+    /* 信息侧边栏 */
+    .info-sidebar {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        border-left: 4px solid #667eea;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    
+    .sidebar-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .sidebar-item {
+        margin-bottom: 20px;
+    }
+    
+    .sidebar-label {
+        font-weight: 500;
+        color: #555;
+        margin-bottom: 5px;
+        font-size: 14px;
+    }
+    
+    .sidebar-value {
+        font-size: 16px;
+        color: #333;
+        font-weight: 500;
+        background: white;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #eee;
+    }
+    
+    /* 提交按钮 */
+    .submit-section {
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+    }
+    
+    .submit-btn { 
+        background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); 
+        color:white; 
+        border:none;
+        padding:14px 40px; 
+        border-radius:6px; 
+        font-size:16px; 
+        font-weight:600; 
+        cursor:pointer; 
+        transition:all 0.3s; 
+        min-width: 200px;
+    }
+    
+    .submit-btn:hover:not(:disabled) { 
+        transform:translateY(-2px); 
+        box-shadow:0 5px 15px rgba(102,126,234,0.4); 
+    }
+    
+    .submit-btn:disabled { 
+        background:#cccccc; 
+        cursor: not-allowed;
+    }
+    
+    .submit-btn:active:not(:disabled) { 
+        transform:translateY(0); 
+    }
+    
+    .success-message {
+        margin-top: 15px;
+        padding: 12px;
+        background: #d4edda;
+        color: #155724;
+        border-radius: 6px;
+        border: 1px solid #c3e6cb;
+        display: none;
+    }
+    
+    /* 隐藏的扫码输入框 */
+    #scannerInput {
+        opacity: 0;
+        position: absolute;
+        left: -9999px;
+    }
+    
+    /* 响应式调整 */
+    @media (max-width: 600px) {
+        .container { padding:15px; }
+        h2 { font-size:22px; margin-bottom:15px; }
+        .card-stack-container {
+            flex-direction: column;
+        }
+        .info-sidebar {
+            width: 100%;
+        }
+        .content-frame {
+            height: 350px;
+            padding: 15px;
+        }
+    }
+    
+    .section {
+        display: none;
+    }
+    
+    #drawingSection {
+        display: block;
+    }
+    
+    /* 新增：电脑版摄像头切换按钮样式 */
+    .camera-toggle-container {
+        margin: 15px 0;
+        text-align: center;
+    }
+    
+    .camera-toggle-btn {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin: 5px;
+    }
+    
+    .camera-toggle-btn:hover {
+        background: #45a049;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    .camera-toggle-btn.stop {
+        background: #f44336;
+    }
+    
+    .camera-toggle-btn.stop:hover {
+        background: #d32f2f;
+    }
+    
+    .scanner-method {
+        font-size: 14px;
+        color: #666;
+        margin-top: 10px;
+        padding: 8px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        display: inline-block;
+    }
+    
+    /* 新增：电脑版摄像头扫描提示 */
+    .camera-instruction {
+        font-size: 14px;
+        color: #2196F3;
+        margin: 10px 0;
+        font-weight: 500;
+    }
+    
+    .scanner-options {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+  <!-- ===== 隐藏 input 用于电脑 scanner ===== -->
+  <input type="text" id="scannerInput" autofocus>
+
+  <!-- ===== 阶段 1：图纸信息 ===== -->
+  <div id="drawingSection" class="section" style="display:block;">
+    <h2>📋 Drawing Information</h2>
+    
+    <div class="drawing-content">
+        <div class="drawing-info">
+            <div class="drawing-card">
+                <div class="drawing-grid">
+                    <div class="info-item">
+                        <div class="info-label">Sales Order No.</div>
+                        <div class="info-value">SO-009999</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Item No.</div>
+                        <div class="info-value">20</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Customer Name</div>
+                        <div class="info-value">Fujimak</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Item Name</div>
+                        <div class="info-value">S/S Table</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Dimension</div>
+                        <div class="info-value">L 870mm x W 760mm x H 50mm</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Quantity</div>
+                        <div class="info-value">1</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Unit of Measurement</div>
+                        <div class="info-value">Set</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Estimated Delivery Date</div>
+                        <div class="info-value">15/01/2025</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="scan-section">
+            <div class="scan-instruction">Please scan your <b>Credential QR Code</b></div>
+            
+            <!-- 电脑版扫码方式选择 -->
+            <div class="scanner-options" id="scannerOptions" style="display: none;">
+                <div class="scanner-method">Choose scanning method:</div>
+            </div>
+            
+            <!-- 摄像头切换按钮 -->
+            <div class="camera-toggle-container" id="cameraToggleContainer" style="display: none;">
+                <button class="camera-toggle-btn" id="cameraToggleBtn">📷 Use Camera to Scan</button>
+            </div>
+            
+            <!-- 摄像头扫描提示 -->
+            <div class="camera-instruction" id="cameraInstruction" style="display: none;">
+                Camera mode: Point camera at QR code
+            </div>
+            
+            <div class="scanner-container" id="scannerContainer">
+                <div class="dashed-box" id="dashedBox">
+                    <div style="font-size: 24px;">📱</div>
+                    <div>QR Code Scanner Area</div>
+                    <div style="font-size: 12px; margin-top: 5px;">虚线框框 - 手机扫码区域</div>
+                </div>
+                <div id="reader"></div>
+            </div>
+
+            <div class="gif-container" id="gifContainer">
+                <p>Use your scanner to scan the Credential QR Code</p>
+                <img src="https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif" alt="Scanner GIF">
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- ===== 阶段 2：工作数据录入页面 ===== -->
+  <div id="workSection" class="section">
+    <h2>📝 Work Data Entry</h2>
+    
+    <div id="userDisplay">Current User: Cyril</div>
+    
+    <div class="card-stack-container">
+        <div class="stack-section">
+            <!-- 卡片堆叠切换 -->
+            <div class="stack-container" id="stack">
+                <div class="card-box c1">
+                    <div class="card-english">Received From</div>
+                    <div class="card-chinese">从哪收到</div>
+                </div>
+                <div class="card-box c2">
+                    <div class="card-english">Job Completed</div>
+                    <div class="card-chinese">已完成的工作</div>
+                </div>
+                <div class="card-box c3">
+                    <div class="card-english">Quality Control</div>
+                    <div class="card-chinese">质量检查</div>
+                </div>
+            </div>
+            
+            <!-- 内容区域 -->
+            <div class="content-frame" id="contentFrame">
+                <!-- 内容会通过JavaScript动态加载 -->
+            </div>
+            
+            <!-- 提交按钮 -->
+            <div class="submit-section">
+                <button id="submitBtn" class="submit-btn">Submit Data</button>
+                <div id="successMessage" class="success-message">
+                    ✅ Data successfully submitted!
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧信息侧边栏 -->
+        <div class="info-sidebar">
+            <div class="sidebar-title">Last User Information</div>
+            <div class="sidebar-item">
+                <div class="sidebar-label">Last User</div>
+                <div class="sidebar-value">Cyril</div>
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-label">Last User Status</div>
+                <div class="sidebar-value">Received From</div>
+            </div>
+            <div class="sidebar-item">
+                <div class="sidebar-label">Last User Selection</div>
+                <div class="sidebar-value">Received from Laser Cutting - 从激光切割部收到</div>
+            </div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function isMobile() {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// 全局变量
+let scannerContainer, dashedBox, gifContainer, drawingSection, workSection, scannerInput;
+let cameraToggleContainer, cameraToggleBtn, cameraInstruction, scannerOptions;
+let currentUser = "";
+let currentCardIndex = 0;
+let selectedOptions = {
+  receivedFrom1: null,
+  receivedFrom2: null,
+  jobCompleted: null,
+  qualityControl: null
+};
+let isSubmitted = false;
+let qcUnlocked = false;
+let html5QrcodeScanner = null;
+let isCameraActive = false;
+
+// 卡片内容和iframe数据
+const cardContents = [
+  { // Received From
+    title: "Received From 从哪收到",
+    frames: [
+      {
+        title: "Received From 从哪收到",
+        options: [
+          {id: "rf1-1", en: "Received 3D Drawing (Completely Stamped)", cn: "收到完整盖章的立体图"},
+          {id: "rf1-2", en: "Received Checked 3D Drawing from Supervisor", cn: "从头手那收到已检查的立体图"},
+          {id: "rf1-3", en: "Received 2D Drawing from Drawing Department", cn: "从绘图部收到展开图"},
+          {id: "rf1-4", en: "Received Checked 2D Drawing from Supervisor", cn: "从头手那收到已检查的展开图"},
+          {id: "rf1-5", en: "Received Stamped 2D Drawing from Document Control", cn: "从文件管理部收到已盖章的展开图"},
+          {id: "rf1-6", en: "Received from Laser Cutting", cn: "从激光切割部收到"},
+          {id: "rf1-7", en: "Received from V Cut", cn: "从V槽切割机收到"},
+          {id: "rf1-8", en: "Received from Bending", cn: "从凹板部收到"},
+          {id: "rf1-9", en: "Received from Cutting", cn: "从切割部收到"},
+          {id: "rf1-10", en: "Received from Welding & Assembly", cn: "从焊接与组装部收到"},
+          {id: "rf1-11", en: "Received from Polishing", cn: "从抛光部收到"},
+          {id: "rf1-12", en: "Received from Acid Wash", cn: "从化学清洗部收到"},
+          {id: "rf1-13", en: "Received from Electrical Work", cn: "从电工部收到"},
+          {id: "rf1-14", en: "Received from Gas Fitting", cn: "从接气管部收到"},
+          {id: "rf1-15", en: "Received from Plumbing Job", cn: "从接水管部收到"},
+          {id: "rf1-16", en: "Received from Quality Control", cn: "从质检部收到"},
+          {id: "rf1-17", en: "Received from Packaging", cn: "从包装部收到"},
+          {id: "rf1-18", en: "Received from Finished Goods Labeling", cn: "从成品标签部收到"},
+          {id: "rf1-19", en: "Received Order from Marketing Department to Deliver Product to Sub-Contractor", cn: "从成品标签部收到"},
+          {id: "rf1-20", en: "Received Order from Marketing Department to Bring Back Processed Product", cn: "从市场部收到指令把代工/分包商处理好的产品拿回来"},
+          {id: "rf1-21", en: "Received Product from Sub Contractor", cn: "从代工/分包商收到产品"}
+        ]
+      },
+      {
+        title: "Check 检查",
+        options: [
+          {id: "rf2-1", en: "Pass", cn: "过关"},
+          {id: "rf2-2", en: "Deficiencies", cn: "不足之处"}
+        ],
+        hasInput: true
+      }
+    ]
+  },
+  { // Job Completed
+    title: "Job Completed 已完成的工作",
+    frames: [
+      {
+        title: "Job Completed 已完成的工作",
+        options: [
+          {id: "jc1-1", en: "QR Code Creation", cn: "二维码创建"},
+          {id: "jc1-2", en: "Document Control: Checked & Stamped", cn: "文件管理: 检查盖章"},
+          {id: "jc1-3", en: "Project Department: Explained & Passed Drawing", cn: "项目部: 讲解 & 下图"},
+          {id: "jc1-4", en: "Supervisor: Checked 3D Drawing", cn: "头手: 完成立体图的检查"},
+          {id: "jc1-5", en: "2D Drawing", cn: "展开图"},
+          {id: "jc1-6", en: "Supervisor: Checked & Signed on 2D Drawing", cn: "头手: 完成展开图的检查并签名"},
+          {id: "jc1-7", en: "Laser Cutting", cn: "激光切割 Skip to question 29"},
+          {id: "jc1-8", en: "V Cut", cn: "V槽切割 Skip to question 29"},
+          {id: "jc1-9", en: "Bending", cn: "凹板 Skip to question 29"},
+          {id: "jc1-10", en: "Cutting", cn: "切割 Skip to question 29"},
+          {id: "jc1-11", en: "Welding & Assembly", cn: "焊接与组装 Skip to question 29"},
+          {id: "jc1-12", en: "Painting", cn: "上漆 Skip to question 29"},
+          {id: "jc1-13", en: "Polishing", cn: "抛光 Skip to question 29"},
+          {id: "jc1-14", en: "Acid Wash", cn: "化学清洗 Skip to question 29"},
+          {id: "jc1-15", en: "Electrical Work", cn: "电工 Skip to question 29"},
+          {id: "jc1-16", en: "Gas Fitting", cn: "气管工 Skip to question 29"},
+          {id: "jc1-17", en: "Plumbing Job", cn: "水管工 Skip to question 29"},
+          {id: "jc1-18", en: "Quality Control", cn: "质检 Skip to question 29"},
+          {id: "jc1-19", en: "Packaging", cn: "包装 Skip to question 29"},
+          {id: "jc1-20", en: "Finished Goods Labeling", cn: "给成品贴标签 Skip to question 29"},
+          {id: "jc1-21", en: "Deliver Product to Sub-Contractor", cn: "送产品到代工/分包商"},
+          {id: "jc1-22", en: "Bring Back Processed Product from Sub-Contractor", cn: "从代工/分包商拿回处理好的产品"},
+          {id: "jc1-23", en: "Shipping Out", cn: "出货"},
+          {id: "jc1-24", en: "QC, Marketing & Supervisor U", cn: "质检、市场部和头手U"}
+        ]
+      }
+    ]
+  },
+  { // Quality Control
+    title: "Quality Control 质量检查",
+    frames: [
+      {
+        title: "Quality Control 质量检查",
+        options: [
+          {id: "qc1-1", en: "Visual Inspection Passed", cn: "目视检查通过"},
+          {id: "qc1-2", en: "Measurement Check Completed", cn: "尺寸检查完成"},
+          {id: "qc1-3", en: "Documentation Verified", cn: "文件验证完成"}
+        ],
+        locked: true
+      }
+    ]
+  }
+];
+
+function handleCredentialScan(user) {
+  // 停止摄像头扫描（如果正在运行）
+  if (isCameraActive && html5QrcodeScanner) {
+    stopCameraScanner();
+  }
+  
+  // 隐藏图纸信息，显示工作数据录入页面
+  drawingSection.style.display = "none";
+  workSection.style.display = "block";
+  currentUser = user;
+  document.getElementById("userDisplay").textContent = `Current User: ${user}`;
+  
+  // 初始化卡片堆叠
+  initCardStack();
+  renderCardContent();
+}
+
+function resetToDrawing() {
+  workSection.style.display = "none";
+  drawingSection.style.display = "block";
+}
+
+// 启动摄像头扫描
+function startCameraScanner() {
+  if (html5QrcodeScanner) {
+    return; // 已经启动
+  }
+  
+  // 清除虚线框框
+  dashedBox.style.display = "none";
+  gifContainer.style.display = "none";
+  
+  // 创建摄像头扫描器
+  html5QrcodeScanner = new Html5Qrcode("reader");
+  
+  // 启动摄像头
+  html5QrcodeScanner.start(
+    { facingMode: "environment" },
+    { 
+      fps: 10, 
+      qrbox: { width: 180, height: 180 }
+    },
+    (decodedText) => {
+      console.log("Camera scanned:", decodedText);
+      if (decodedText === "Cyril") {
+        handleCredentialScan("Cyril");
+      } else {
+        alert("Unknown user QR. Please scan a valid credential.");
+      }
+    },
+    (errorMessage) => {
+      // 忽略解析错误
+    }
+  ).catch(err => {
+    console.error("Camera error:", err);
+    alert("Camera initialization failed. Please check camera permissions.");
+    stopCameraScanner();
+  });
+  
+  // 更新UI状态
+  isCameraActive = true;
+  cameraToggleBtn.textContent = "❌ Stop Camera";
+  cameraToggleBtn.classList.add("stop");
+  cameraInstruction.style.display = "block";
+}
+
+// 停止摄像头扫描
+function stopCameraScanner() {
+  if (html5QrcodeScanner && isCameraActive) {
+    html5QrcodeScanner.stop().then(() => {
+      console.log("Camera stopped");
+      html5QrcodeScanner.clear();
+      html5QrcodeScanner = null;
+      
+      // 恢复虚线框框
+      dashedBox.style.display = "flex";
+      gifContainer.style.display = "block";
+      
+      // 更新UI状态
+      isCameraActive = false;
+      cameraToggleBtn.textContent = "📷 Use Camera to Scan";
+      cameraToggleBtn.classList.remove("stop");
+      cameraInstruction.style.display = "none";
+      
+      // 重新聚焦到扫描仪输入框
+      scannerInput.focus();
+    }).catch(err => {
+      console.error("Stop camera error:", err);
+    });
+  }
+}
+
+// 摄像头切换按钮事件
+function toggleCameraScanner() {
+  if (!isCameraActive) {
+    startCameraScanner();
+  } else {
+    stopCameraScanner();
+  }
+}
+
+// 卡片堆叠功能
+function initCardStack() {
+  const boxes = document.querySelectorAll('.card-box');
+  const stack = document.getElementById('stack');
+  
+  function render() {
+    boxes.forEach((box, i) => {
+      const offset = (i - currentCardIndex + boxes.length) % boxes.length;
+
+      if (offset === 0) {
+        box.style.transform = 'translate(0,0) scale(1)';
+        box.style.opacity = '1';
+        box.style.zIndex = 10;
+        box.style.boxShadow = '0 18px 40px rgba(0,0,0,0.25)';
+      } else {
+        box.style.transform =
+          `translate(${offset * 18}px, ${-offset * 12}px) scale(${1 - offset * 0.04})`;
+        box.style.opacity = '0.85';
+        box.style.zIndex = 10 - offset;
+        box.style.boxShadow = '0 8px 20px rgba(0,0,0,0.12)';
+      }
+    });
+
+    renderCardContent();
+  }
+
+  function next() {
+    currentCardIndex = (currentCardIndex + 1) % boxes.length;
+    render();
+  }
+
+  // 点击切换
+  boxes.forEach(box => {
+    box.addEventListener('click', next);
+  });
+
+  // Swipe 支持
+  let startX = 0;
+
+  stack.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+  });
+
+  stack.addEventListener('touchend', e => {
+    const endX = e.changedTouches[0].clientX;
+    if (Math.abs(endX - startX) > 40) {
+      next();
+    }
+  });
+
+  // 初始化渲染
+  render();
+}
+
+// 渲染卡片内容
+function renderCardContent() {
+  const contentFrame = document.getElementById('contentFrame');
+  const currentCard = cardContents[currentCardIndex];
+  
+  let contentHTML = `<div class="frame-title">${currentCard.title}</div>`;
+  
+  if (currentCardIndex === 0) { // Received From
+    contentHTML += `
+      <div style="margin-bottom: 25px;">
+        <div style="font-weight: 600; margin-bottom: 10px; color: #333;">${currentCard.frames[0].title}:</div>
+        ${renderOptions(currentCard.frames[0].options, 'receivedFrom1')}
+      </div>
+      <div>
+        <div style="font-weight: 600; margin-bottom: 10px; color: #333;">${currentCard.frames[1].title}:</div>
+        ${renderOptions(currentCard.frames[1].options, 'receivedFrom2')}
+        ${currentCard.frames[1].hasInput ? `
+          <div id="deficiencyInput" style="margin-top: 15px; display: none;">
+            <div style="margin-bottom: 8px; font-weight: 500; color: #555;">Deficiency Details (不足之处详情):</div>
+            <input type="text" id="deficiencyText" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Enter deficiency details here...">
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } else if (currentCardIndex === 1) { // Job Completed
+    contentHTML += `
+      <div>
+        ${renderOptions(currentCard.frames[0].options, 'jobCompleted')}
+      </div>
+    `;
+  } else if (currentCardIndex === 2) { // Quality Control
+    if (!qcUnlocked) {
+      contentHTML += `
+        <div style="text-align: center; padding: 40px 20px;">
+          <div style="font-size: 18px; color: #666; margin-bottom: 20px;">Quality Control section is locked</div>
+          <div class="password-section">
+            <div style="margin-bottom: 10px; color: #555;">Enter password to unlock:</div>
+            <div class="password-input">
+              <input type="password" id="qcPassword" placeholder="Enter password...">
+              <button onclick="checkQCPassword()">Unlock</button>
+            </div>
+            <div id="passwordError" style="color: #e74c3c; margin-top: 10px; display: none;">Incorrect password. Try again.</div>
+          </div>
+        </div>
+      `;
+    } else {
+      contentHTML += `
+        <div>
+          ${renderOptions(currentCard.frames[0].options, 'qualityControl')}
+        </div>
+      `;
+    }
+  }
+  
+  contentFrame.innerHTML = contentHTML;
+  
+  // 添加选项选择事件监听
+  addOptionListeners();
+  
+  // 如果有已选择的选项，恢复选择状态
+  restoreSelectedOptions();
+}
+
+// 渲染选项列表
+function renderOptions(options, category) {
+  let html = '';
+  options.forEach(option => {
+    html += `
+      <div class="option-item" data-id="${option.id}" data-category="${category}">
+        <input type="radio" name="${category}" id="${option.id}" class="option-checkbox">
+        <label for="${option.id}" class="option-label">
+          <div class="option-english">${option.en}</div>
+          <div class="option-chinese">${option.cn}</div>
+        </label>
+      </div>
+    `;
+  });
+  return html;
+}
+
+// 添加选项选择事件监听
+function addOptionListeners() {
+  document.querySelectorAll('.option-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+      const optionId = this.id;
+      const category = this.name;
+      
+      // 保存选择
+      selectedOptions[category] = optionId;
+      
+      // 如果是Received From的Deficiencies选项，显示输入框
+      if (optionId === 'rf2-2') {
+        document.getElementById('deficiencyInput').style.display = 'block';
+      } else if (category === 'receivedFrom2' && optionId !== 'rf2-2') {
+        document.getElementById('deficiencyInput').style.display = 'none';
+      }
+      
+      // 更新提交按钮状态
+      updateSubmitButton();
+    });
+  });
+}
+
+// 恢复已选择的选项
+function restoreSelectedOptions() {
+  Object.keys(selectedOptions).forEach(category => {
+    const optionId = selectedOptions[category];
+    if (optionId) {
+      const checkbox = document.getElementById(optionId);
+      if (checkbox) {
+        checkbox.checked = true;
+        
+        // 如果是Deficiencies选项，显示输入框
+        if (optionId === 'rf2-2') {
+          const deficiencyInput = document.getElementById('deficiencyInput');
+          if (deficiencyInput) deficiencyInput.style.display = 'block';
+        }
+      }
+    }
+  });
+}
+
+// 检查QC密码
+function checkQCPassword() {
+  const passwordInput = document.getElementById('qcPassword');
+  const passwordError = document.getElementById('passwordError');
+  
+  if (passwordInput.value === '1234') {
+    qcUnlocked = true;
+    renderCardContent();
+  } else {
+    passwordError.style.display = 'block';
+    passwordInput.value = '';
+  }
+}
+
+// 更新提交按钮状态
+function updateSubmitButton() {
+  const submitBtn = document.getElementById('submitBtn');
+  
+  // 检查当前卡片是否有选择
+  let hasSelection = false;
+  if (currentCardIndex === 0) { // Received From
+    hasSelection = selectedOptions.receivedFrom1 && selectedOptions.receivedFrom2;
+  } else if (currentCardIndex === 1) { // Job Completed
+    hasSelection = selectedOptions.jobCompleted !== null;
+  } else if (currentCardIndex === 2) { // Quality Control
+    hasSelection = qcUnlocked && selectedOptions.qualityControl !== null;
+  }
+  
+  submitBtn.disabled = !hasSelection || isSubmitted;
+}
+
+// 提交数据
+function submitData() {
+  if (isSubmitted) return;
+  
+  const successMessage = document.getElementById('successMessage');
+  const submitBtn = document.getElementById('submitBtn');
+  
+  // 显示成功消息
+  successMessage.style.display = 'block';
+  
+  // 禁用提交按钮
+  submitBtn.disabled = true;
+  isSubmitted = true;
+  
+  // 记录提交数据
+  console.log('Data submitted:', {
+    user: currentUser,
+    cardIndex: currentCardIndex,
+    selectedOptions: selectedOptions,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// 页面初始化
+document.addEventListener('DOMContentLoaded', function() {
+  scannerContainer = document.getElementById("scannerContainer");
+  dashedBox = document.getElementById("dashedBox");
+  gifContainer = document.getElementById("gifContainer");
+  drawingSection = document.getElementById("drawingSection");
+  workSection = document.getElementById("workSection");
+  scannerInput = document.getElementById("scannerInput");
+  
+  // 新增元素
+  cameraToggleContainer = document.getElementById("cameraToggleContainer");
+  cameraToggleBtn = document.getElementById("cameraToggleBtn");
+  cameraInstruction = document.getElementById("cameraInstruction");
+  scannerOptions = document.getElementById("scannerOptions");
+  
+  // 绑定提交按钮事件
+  document.getElementById('submitBtn').addEventListener('click', submitData);
+  
+  // 绑定摄像头切换按钮事件
+  cameraToggleBtn.addEventListener('click', toggleCameraScanner);
+  
+  if (isMobile()) {
+    // 手机打开，显示摄像头扫码
+    scannerContainer.style.display = "block";
+    dashedBox.style.display = "none";
+    gifContainer.style.display = "none";
+    
+    const html5QrcodeScanner = new Html5Qrcode("reader");
+
+    html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 }
+      },
+      (decodedText) => {
+        console.log("Scanned:", decodedText);
+        if(decodedText === "Cyril") {
+          html5QrcodeScanner.stop();
+          handleCredentialScan("Cyril");
+        } else {
+          alert("Unknown user QR. Please scan a valid credential.");
+        }
+      }
+    ).catch(err => {
+      console.error(err);
+      alert("Camera initialization failed. Please check camera permissions.");
+    });
+
+  } else {
+    // 电脑打开，显示虚线框框和GIF提示
+    scannerContainer.style.display = "block";
+    dashedBox.style.display = "flex";
+    gifContainer.style.display = "block";
+    
+    // 显示电脑版专属UI元素
+    cameraToggleContainer.style.display = "block";
+    scannerOptions.style.display = "block";
+
+    // 每次点击页面都 focus 隐藏输入框，保证 scanner 输入能捕获
+    document.addEventListener("click", () => scannerInput.focus());
+
+    // 监听 scanner 输入
+    scannerInput.addEventListener("keydown", (e) => {
+      if(e.key === "Enter") {
+        const value = scannerInput.value.trim();
+        scannerInput.value = "";
+        if(value === "Cyril") {
+          handleCredentialScan("Cyril");
+        } else {
+          alert("Unknown user. Please scan a valid credential QR code.");
+        }
+      }
+    });
+
+    // 页面加载后自动 focus 输入框
+    window.onload = () => {
+      scannerInput.focus();
+    };
+  }
+});
+</script>
+</body>
+</html>
